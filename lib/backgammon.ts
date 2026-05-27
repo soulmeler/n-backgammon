@@ -1,4 +1,6 @@
-export type Player = "white" | "black";
+export * from "./longNardy";
+
+/*
 
 export type Difficulty = "easy" | "medium" | "hard";
 
@@ -35,8 +37,51 @@ export interface MatchResult {
   source: "local";
 }
 
-const HOME_WHITE = [18, 19, 20, 21, 22, 23];
-const HOME_BLACK = [0, 1, 2, 3, 4, 5];
+// Длинные нарды: оба игрока двигаются в одну сторону (против часовой),
+// с разных "голов" и выносят в разных домах.
+// На текущей разметке доски:
+// - голова белых: нижний-левый угол (index 11)
+// - голова черных: верхний-правый угол (index 23)
+// - дом белых / вынос: нижний-правый квадрант (index 0..5)
+// - дом черных / вынос: верхний-левый квадрант (index 12..17)
+const HOME_WHITE = [0, 1, 2, 3, 4, 5];
+const HOME_BLACK = [12, 13, 14, 15, 16, 17];
+const HEAD_WHITE = 11;
+const HEAD_BLACK = 23;
+
+const PATH_CCW: number[] = [
+  11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12
+];
+
+const POS_IN_PATH: number[] = (() => {
+  const res = new Array<number>(24).fill(-1);
+  for (let i = 0; i < PATH_CCW.length; i += 1) {
+    res[PATH_CCW[i]] = i;
+  }
+  return res;
+})();
+
+function homeSet(player: Player): Set<number> {
+  return new Set(player === "white" ? HOME_WHITE : HOME_BLACK);
+}
+
+function pointNumberInHome(player: Player, index: number): number | null {
+  // Возвращает 1..6 если index в доме игрока и соответствует "номеру пункта" при выносе.
+  if (player === "white") {
+    if (index < 0 || index > 5) return null;
+    return index + 1;
+  }
+  if (index < 12 || index > 17) return null;
+  return index - 11;
+}
+
+function moveAlongCcw(from: number, die: number): number {
+  const pos = POS_IN_PATH[from];
+  if (pos < 0) {
+    return from;
+  }
+  return PATH_CCW[(pos + die) % 24];
+}
 
 export function createInitialState(): GameState {
   const points = new Array(24).fill(0);
@@ -81,9 +126,9 @@ function checkerAt(state: GameState, index: number, player: Player): number {
 function isOpenFor(state: GameState, index: number, player: Player): boolean {
   const point = state.points[index];
   if (player === "white") {
-    return point > -2;
+    return point >= 0;
   }
-  return point < 2;
+  return point <= 0;
 }
 
 function allInHome(state: GameState, player: Player): boolean {
@@ -91,17 +136,9 @@ function allInHome(state: GameState, player: Player): boolean {
     return false;
   }
 
-  if (player === "white") {
-    for (let i = 0; i < 18; i += 1) {
-      if (state.points[i] > 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  for (let i = 6; i < 24; i += 1) {
-    if (state.points[i] < 0) {
+  const home = homeSet(player);
+  for (let i = 0; i < 24; i += 1) {
+    if (!home.has(i) && checkerAt(state, i, player) > 0) {
       return false;
     }
   }
@@ -113,31 +150,25 @@ function canBearOffFrom(state: GameState, player: Player, from: number, die: num
     return false;
   }
 
-  if (player === "white") {
-    const target = from + die;
-    if (target === 24) {
-      return true;
-    }
-    if (target > 24) {
-      // Overshoot is legal only when there are no checkers on higher points.
-      for (let i = from + 1; i <= 23; i += 1) {
-        if (state.points[i] > 0) {
+  const n = pointNumberInHome(player, from);
+  if (n === null) {
+    return false;
+  }
+  if (die === n) {
+    return true;
+  }
+  if (die > n) {
+    // Перебор разрешён только если нет шашек на "более высоких" пунктах дома.
+    if (player === "white") {
+      for (let idx = from + 1; idx <= 5; idx += 1) {
+        if (state.points[idx] > 0) {
           return false;
         }
       }
       return true;
     }
-    return false;
-  }
-
-  const target = from - die;
-  if (target === -1) {
-    return true;
-  }
-  if (target < -1) {
-    // Overshoot is legal only when there are no checkers on lower points.
-    for (let i = from - 1; i >= 0; i -= 1) {
-      if (state.points[i] < 0) {
+    for (let idx = from + 1; idx <= 17; idx += 1) {
+      if (state.points[idx] < 0) {
         return false;
       }
     }
@@ -156,32 +187,24 @@ function barEntryIndex(player: Player, die: number): number {
 export function getLegalMovesForDie(state: GameState, player: Player, die: number): Move[] {
   const moves: Move[] = [];
 
-  if (state.bar[player] > 0) {
-    const entry = barEntryIndex(player, die);
-    if (isOpenFor(state, entry, player)) {
-      const hit = player === "white" ? state.points[entry] === -1 : state.points[entry] === 1;
-      moves.push({ from: "bar", to: entry, die, hit });
-    }
-    return moves;
-  }
+  // В длинных нардах нет ударов и нет бара.
 
   for (let from = 0; from < 24; from += 1) {
     if (checkerAt(state, from, player) < 1) {
       continue;
     }
 
-    const to = player === "white" ? from + die : from - die;
-
-    if (to >= 0 && to < 24) {
-      if (isOpenFor(state, to, player)) {
-        const hit = player === "white" ? state.points[to] === -1 : state.points[to] === 1;
-        moves.push({ from, to, die, hit });
-      }
+    if (canBearOffFrom(state, player, from, die)) {
+      moves.push({ from, to: "off", die, hit: false });
       continue;
     }
 
-    if (canBearOffFrom(state, player, from, die)) {
-      moves.push({ from, to: "off", die, hit: false });
+    const to = moveAlongCcw(from, die);
+    if (to === from) {
+      continue;
+    }
+    if (isOpenFor(state, to, player)) {
+      moves.push({ from, to, die, hit: false });
     }
   }
 
@@ -192,7 +215,8 @@ export function applyMove(state: GameState, player: Player, move: Move): GameSta
   const next = cloneState(state);
 
   if (move.from === "bar") {
-    next.bar[player] -= 1;
+    // В длинных нардах не должно происходить входа с бара.
+    return state;
   } else if (player === "white") {
     next.points[move.from] -= 1;
   } else {
@@ -205,16 +229,8 @@ export function applyMove(state: GameState, player: Player, move: Move): GameSta
   }
 
   if (player === "white") {
-    if (next.points[move.to] === -1) {
-      next.points[move.to] = 0;
-      next.bar.black += 1;
-    }
     next.points[move.to] += 1;
   } else {
-    if (next.points[move.to] === 1) {
-      next.points[move.to] = 0;
-      next.bar.white += 1;
-    }
     next.points[move.to] -= 1;
   }
 
@@ -230,7 +246,9 @@ function exploreSequences(
   player: Player,
   dice: number[],
   path: Move[],
-  result: TurnSequence[]
+  result: TurnSequence[],
+  movedFromHead: number,
+  maxFromHead: number
 ): void {
   if (dice.length === 0) {
     result.push({ moves: path, endState: state });
@@ -249,8 +267,13 @@ function exploreSequences(
     moved = true;
 
     for (const move of options) {
+      const headIndex = player === "white" ? HEAD_WHITE : HEAD_BLACK;
+      const isFromHead = typeof move.from === "number" && move.from === headIndex;
+      if (isFromHead && movedFromHead >= maxFromHead) {
+        continue;
+      }
       const after = applyMove(state, player, move);
-      exploreSequences(after, player, removeDieAt(dice, i), [...path, move], result);
+      exploreSequences(after, player, removeDieAt(dice, i), [...path, move], result, movedFromHead + (isFromHead ? 1 : 0), maxFromHead);
     }
   }
 
@@ -261,8 +284,31 @@ function exploreSequences(
 
 export function getLegalTurnSequences(state: GameState, player: Player, dice: number[]): TurnSequence[] {
   const raw: TurnSequence[] = [];
-  exploreSequences(cloneState(state), player, [...dice], [], raw);
+  exploreSequences(cloneState(state), player, [...dice], [], raw, 0, 1);
+  return finalizeTurnSequences(state, player, dice, raw, false);
+}
 
+export function getLegalTurnSequencesWithContext(
+  state: GameState,
+  player: Player,
+  dice: number[],
+  ctx: { isFirstTurn: boolean }
+): TurnSequence[] {
+  const raw: TurnSequence[] = [];
+  const isDouble = dice.length === 4 && dice.every((d) => d === dice[0]);
+  const forcedTwoFromHead = ctx.isFirstTurn && isDouble && (dice[0] === 3 || dice[0] === 4 || dice[0] === 6);
+  const maxFromHead = ctx.isFirstTurn ? 2 : 1;
+  exploreSequences(cloneState(state), player, [...dice], [], raw, 0, maxFromHead);
+  return finalizeTurnSequences(state, player, dice, raw, forcedTwoFromHead);
+}
+
+function finalizeTurnSequences(
+  state: GameState,
+  player: Player,
+  dice: number[],
+  raw: TurnSequence[],
+  forcedTwoFromHead: boolean
+): TurnSequence[] {
   const maxMoves = raw.reduce((max, seq) => Math.max(max, seq.moves.length), 0);
   let best = raw.filter((seq) => seq.moves.length === maxMoves);
 
@@ -274,7 +320,17 @@ export function getLegalTurnSequences(state: GameState, player: Player, dice: nu
     const high = Math.max(dice[0], dice[1]);
     const usingHigh = best.filter((seq) => seq.moves[0]?.die === high);
     if (usingHigh.length > 0) {
-      return usingHigh;
+      best = usingHigh;
+    }
+  }
+
+  if (forcedTwoFromHead) {
+    const headIndex = player === "white" ? HEAD_WHITE : HEAD_BLACK;
+    const headMoves = (seq: TurnSequence) =>
+      seq.moves.reduce((acc, m) => acc + (typeof m.from === "number" && m.from === headIndex ? 1 : 0), 0);
+    const maxHead = best.reduce((acc, s) => Math.max(acc, headMoves(s)), 0);
+    if (maxHead >= 2) {
+      best = best.filter((s) => headMoves(s) >= 2);
     }
   }
 
@@ -294,18 +350,20 @@ export function isFinished(state: GameState): Player | null {
 export function pipCount(state: GameState, player: Player): number {
   let score = 0;
 
-  if (player === "white") {
-    for (let i = 0; i < 24; i += 1) {
-      const count = Math.max(0, state.points[i]);
-      score += count * (24 - i);
-    }
-    score += state.bar.white * 25;
-  } else {
-    for (let i = 0; i < 24; i += 1) {
-      const count = Math.max(0, -state.points[i]);
-      score += count * (i + 1);
-    }
-    score += state.bar.black * 25;
+  const bearOffEdge = player === "white" ? 0 : 12;
+  const bearOffPos = POS_IN_PATH[bearOffEdge];
+
+  for (let i = 0; i < 24; i += 1) {
+    const count = checkerAt(state, i, player);
+    if (count < 1) continue;
+
+    const pos = POS_IN_PATH[i];
+    if (pos < 0) continue;
+
+    const stepsToEdge = (bearOffPos - pos + 24) % 24;
+    const homeN = pointNumberInHome(player, i);
+    const distance = homeN ? homeN : stepsToEdge + 1;
+    score += count * distance;
   }
 
   return score;
@@ -315,7 +373,6 @@ export function evaluateStateForBlack(state: GameState): number {
   const blackPip = pipCount(state, "black");
   const whitePip = pipCount(state, "white");
 
-  const barPressure = state.bar.white * 18 - state.bar.black * 18;
   const offBonus = state.off.black * 22 - state.off.white * 22;
 
   let anchorBonus = 0;
@@ -330,7 +387,7 @@ export function evaluateStateForBlack(state: GameState): number {
     }
   }
 
-  return whitePip - blackPip + barPressure + offBonus + anchorBonus;
+  return whitePip - blackPip + offBonus + anchorBonus;
 }
 
 export function chooseHeuristicSequence(
@@ -390,3 +447,5 @@ export function formatDuration(seconds: number): string {
   const secs = seconds % 60;
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
+
+*/

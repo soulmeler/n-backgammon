@@ -13,6 +13,7 @@ import {
   createInitialState,
   formatDuration,
   getLegalTurnSequences,
+  getLegalTurnSequencesWithContext,
   isFinished,
   rollDice,
   serializeForAI
@@ -100,6 +101,7 @@ export default function BlitzGammonApp() {
   const [finishedDurationSec, setFinishedDurationSec] = useState(0);
   const [nowTick, setNowTick] = useState(Date.now());
   const [moveLog, setMoveLog] = useState<string[]>([]);
+  const [turnsTaken, setTurnsTaken] = useState<{ white: number; black: number }>({ white: 0, black: 0 });
 
   const [history, setHistory] = useState<MatchResult[]>([]);
   const aiTurnTokenRef = useRef(0);
@@ -174,8 +176,8 @@ export default function BlitzGammonApp() {
     if (phase !== "playing" || turn !== "white") {
       return [];
     }
-    return getLegalTurnSequences(gameState, "white", dice);
-  }, [phase, turn, gameState, dice]);
+    return getLegalTurnSequencesWithContext(gameState, "white", dice, { isFirstTurn: turnsTaken.white === 0 });
+  }, [phase, turn, gameState, dice, turnsTaken.white]);
 
   const firstMoves = useMemo(() => {
     const uniq = new Map<string, Move>();
@@ -261,7 +263,7 @@ export default function BlitzGammonApp() {
         return;
       }
 
-      const sequences = getLegalTurnSequences(stateAtBlackStart, "black", rolled);
+      const sequences = getLegalTurnSequencesWithContext(stateAtBlackStart, "black", rolled, { isFirstTurn: turnsTaken.black === 0 });
 
       let chosen = chooseHeuristicSequence(sequences, difficulty, stateAtBlackStart);
 
@@ -298,6 +300,7 @@ export default function BlitzGammonApp() {
         return;
       }
 
+      setTurnsTaken((prev) => ({ ...prev, black: prev.black + 1 }));
       const whiteRoll = rollDice();
       if (token !== aiTurnTokenRef.current || phase !== "playing") {
         return;
@@ -308,7 +311,7 @@ export default function BlitzGammonApp() {
       setAiThinking(false);
       setStatusText(`Ваш ход. Кубики: ${whiteRoll.join("-")}`);
     },
-    [difficulty, finishGame, phase]
+    [difficulty, finishGame, phase, turnsTaken.black]
   );
 
   const scheduleAiTurn = useCallback(
@@ -343,6 +346,7 @@ export default function BlitzGammonApp() {
     setSelectedFrom(null);
     setAiThinking(false);
     setMoveLog([]);
+    setTurnsTaken({ white: 0, black: 0 });
     setMatchStartAt(Date.now());
     setNowTick(Date.now());
     setFinishedDurationSec(0);
@@ -393,6 +397,7 @@ export default function BlitzGammonApp() {
 
     if (nextDice.length === 0) {
       setStatusText("Ход AI...");
+      setTurnsTaken((prev) => ({ ...prev, white: prev.white + 1 }));
       scheduleAiTurn(nextState, 300);
       return;
     }
@@ -407,6 +412,7 @@ export default function BlitzGammonApp() {
 
     if (firstMoves.length === 0) {
       setStatusText("Нет доступных ходов. Ход AI.");
+      setTurnsTaken((prev) => ({ ...prev, white: prev.white + 1 }));
       scheduleAiTurn(gameState, 320);
     }
 
@@ -489,7 +495,7 @@ export default function BlitzGammonApp() {
             </div>
 
             {phase !== "setup" && (
-              <div className="grid items-stretch gap-3">
+              <div className="grid items-stretch gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
                 <BackgammonBoard
                   state={gameState}
                   selectedFrom={selectedFrom}
@@ -499,7 +505,7 @@ export default function BlitzGammonApp() {
                   disabled={turn !== "white" || aiThinking || phase !== "playing"}
                 />
 
-                <aside className="mx-auto flex min-h-[760px] w-[260px] flex-col rounded-none border border-[var(--line)] bg-[var(--card)] p-3 sm:w-[300px]">
+                <aside className="flex min-h-[760px] w-full flex-col rounded-none border border-[var(--line)] bg-[var(--card)] p-3 md:w-[280px]">
                   <h3 className="text-sm font-semibold">Панель партии</h3>
                   <p className="mt-1 text-xs text-[var(--ink)]/80">Ход: {turn === "white" ? "Вы" : "AI"}</p>
                   <p className="text-xs text-[var(--ink)]/80">Кубики: {dice.length > 0 ? dice.join("-") : "-"}</p>

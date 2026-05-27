@@ -74,11 +74,11 @@ function PointColumn({
       type="button"
       onClick={() => onClick(point)}
       disabled={disabled}
-      className={`relative flex h-[260px] w-full flex-col items-center ${isTop ? "justify-start" : "justify-end"} overflow-hidden rounded-md bg-transparent p-1 transition ${ring} ${
+      className={`relative flex h-[300px] w-full flex-col items-center ${isTop ? "justify-start" : "justify-end"} overflow-hidden rounded-md bg-transparent p-1 transition ${ring} ${
         disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
       }`}
     >
-      <div className={`h-[176px] ${triangleClass}`} />
+      <div className={`h-full ${triangleClass}`} />
       <div className={`absolute ${isTop ? "top-2" : "bottom-2"} flex w-full flex-col items-center gap-1`}>
         {owner &&
           [...Array(Math.min(count, 5))].map((_, i) => (
@@ -117,7 +117,7 @@ export default function BackgammonBoard({
   const offTo = selectableTo.has("off");
 
   return (
-    <section className="board-panel mx-auto w-full max-w-[1050px] rounded-none p-3 sm:p-4">
+    <section className="board-panel mx-auto w-full max-w-[760px] rounded-none p-3 sm:p-4">
       <div className="grid grid-cols-[1fr_88px_1fr] grid-rows-2 gap-x-2 gap-y-0">
         <div className="grid grid-cols-6 gap-1">
           {topLeft.map((point) => (
@@ -135,7 +135,7 @@ export default function BackgammonBoard({
           ))}
         </div>
 
-        <div className="row-span-2 flex h-full min-h-[522px] flex-col overflow-hidden rounded-none border-x-2 border-[color:var(--accent)] bg-gradient-to-b from-[#d9d2c3] via-[#cfc6b5] to-[#d7cfbf]">
+        <div className="row-span-2 flex h-full min-h-[600px] flex-col overflow-hidden rounded-none border-x-2 border-[color:var(--accent)] bg-gradient-to-b from-[#d9d2c3] via-[#cfc6b5] to-[#d7cfbf]">
           <button
             type="button"
             onClick={() => onPointClick("bar")}
