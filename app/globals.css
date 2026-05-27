@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f5f3ec;
+  --card: #fffaf0;
+  --ink: #171717;
+  --accent: #1f4c45;
+  --accent-soft: #2f6d63;
+  --line: #d8d0bf;
+  --shadow: rgba(15, 22, 20, 0.14);
+}
+
+.dark {
+  --bg: #121513;
+  --card: #1a201d;
+  --ink: #e8e2d6;
+  --accent: #89bfa7;
+  --accent-soft: #6fa18c;
+  --line: #2a332f;
+  --shadow: rgba(0, 0, 0, 0.35);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+}
+
+.board-panel {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--card) 90%, var(--accent) 10%), var(--card));
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 28px var(--shadow);
+}
+
+.triangle-light {
+  width: 100%;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: color-mix(in srgb, var(--accent) 20%, var(--card) 80%);
+}
+
+.triangle-dark {
+  width: 100%;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: color-mix(in srgb, var(--accent) 65%, #0f1816 35%);
+}
+
+.triangle-light-down {
+  width: 100%;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: color-mix(in srgb, var(--accent) 20%, var(--card) 80%);
+}
+
+.triangle-dark-down {
+  width: 100%;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: color-mix(in srgb, var(--accent) 65%, #0f1816 35%);
+}
+
+.checker {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 45%, black 55%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+
+.checker-white {
+  background: radial-gradient(circle at 30% 30%, #ffffff, #d4cfbf);
+}
+
+.checker-black {
+  background: radial-gradient(circle at 30% 30%, #3b4943, #141917);
+}
